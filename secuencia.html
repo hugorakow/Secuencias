@@ -764,6 +764,19 @@
     return a;
   }
 
+  // Firebase convierte arrays con huecos "null" en objetos sparse al guardarlos.
+  // Esta función reconstruye siempre un array real de 144 posiciones.
+  function normalizeCells(raw){
+    const arr = new Array(144).fill(null);
+    if (raw){
+      Object.keys(raw).forEach(k => {
+        const idx = parseInt(k, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < 144) arr[idx] = raw[k];
+      });
+    }
+    return arr;
+  }
+
   document.getElementById('btn-start-game').addEventListener('click', async () => {
     if (!currentRoomCode) return;
     const roomRef = db.ref(`${ROOT}/rooms/${currentRoomCode}`);
@@ -912,7 +925,7 @@
 
     // Tablero
     const board = room.board || [];
-    const cells = room.cells || new Array(144).fill(null);
+    const cells = normalizeCells(room.cells);
     const boardEl = document.getElementById('game-board');
 
     let targetIndices = [];
@@ -1069,7 +1082,7 @@
     if (currentTurnId !== myPlayerId) return;
 
     const myColor = fresh.players[myPlayerId].color;
-    const cells = (fresh.cells || new Array(144).fill(null)).slice();
+    const cells = normalizeCells(fresh.cells);
     const myHand = (fresh.players[myPlayerId].hand || []).slice();
     const handIdx = myHand.findIndex(c => c.type === card.type && c.value === card.value);
     if (handIdx === -1) return;
