@@ -310,7 +310,7 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size: clamp(8px, 1.5vw, 15px);
+    font-size: clamp(10px, 2.4vw, 22px);
     user-select: none;
   }
   .gcell:nth-child(odd){ background: #17191f; }
@@ -749,17 +749,30 @@
     }
   }
 
-  const SYMBOLS_POOL = [
-    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
-    '🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🦆','🦅',
-    '🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌',
-    '🐞','🐜','🦗','🕷️','🐢','🐍','🦎','🐙','🦑','🦀',
-    '🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🦓','🦍',
-    '🐘','🦛','🦏','🐪','🐫','🦒','🦘','🐃','🐂','🐄',
-    '🐎','🐖','🐑','🐐','🦌','🐕','🍎','🍊','🍋','🍇',
-    '🍓','🍒','🍍','🥑','🌽','🍄','🌵','🌸','🌻','🍀',
-    '⚽','🏀','🎸','🎨','🎲','🚀','⚓','🔥','⭐','❄️'
-  ];
+  const SYMBOL_LETTERS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
+  const SYMBOL_COLORS = {
+    purpura: '#a855f7',
+    naranja: '#f97316',
+    cian:    '#06b6d4',
+    fucsia:  '#ec4899',
+    lima:    '#84cc16',
+    gris:    '#94a3b8'
+  };
+  const SYMBOLS_POOL = [];
+  Object.keys(SYMBOL_COLORS).forEach(colorName => {
+    SYMBOL_LETTERS.forEach(letter => {
+      SYMBOLS_POOL.push(`${letter}-${colorName}`);
+    });
+  });
+
+  function renderSymbol(el, value){
+    const [letter, colorName] = value.split('-');
+    const hex = SYMBOL_COLORS[colorName] || '#666';
+    el.textContent = letter;
+    el.style.color = hex;
+    el.style.fontFamily = "'Syne', sans-serif";
+    el.style.fontWeight = '800';
+  }
 
   function shuffleArr(arr){
     const a = arr.slice();
@@ -986,7 +999,7 @@
     for (let i = 0; i < 144; i++){
       const cell = document.createElement('div');
       cell.className = 'gcell';
-      cell.textContent = board[i] || '';
+      if (board[i]) renderSymbol(cell, board[i]);
       if (cells[i]){
         const piece = document.createElement('div');
         piece.className = 'piece ' + cells[i];
@@ -1029,7 +1042,11 @@
       if (card.type !== 'symbol') cardEl.classList.add('special', card.type);
       if (idx === selectedCardIndex) cardEl.classList.add('selected');
       if (!isMyTurn) cardEl.classList.add('disabled');
-      cardEl.textContent = card.value;
+      if (card.type === 'symbol'){
+        renderSymbol(cardEl, card.value);
+      } else {
+        cardEl.textContent = card.value;
+      }
       cardEl.addEventListener('click', () => {
         if (!isMyTurn) return;
         if (selectedCardIndex === idx){
