@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secuencia</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg: #0d0f14;
+    --panel: #14171f;
+    --panel-2: #191c25;
+    --line: #262b36;
+    --accent: #ff6b4a;
+    --accent-dim: #3a2620;
+    --text: #eef0f4;
+    --text-dim: #8890a0;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --green: #22c55e;
+    --yellow: #eab308;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin:0; padding:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+  }
+  #app{
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 32px 18px 60px;
+    min-height: 100vh;
+  }
+  .screen{ display: none; animation: fade .25s ease; }
+  .screen.active{ display: block; }
+  @keyframes fade{ from{ opacity:0; transform: translateY(6px);} to{opacity:1; transform:none;} }
+
+  h1{
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: clamp(28px, 8vw, 38px);
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  h1 span{ color: var(--accent); }
+  .subtitle{
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  h2{
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 20px;
+    margin: 0 0 18px;
+  }
+
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 14px;
+  }
+
+  label{
+    display:block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input[type=text]{
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    margin-bottom: 16px;
+  }
+  input[type=text]:focus{ outline: none; border-color: var(--accent); }
+  input[type=text].code-input{
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    text-align: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+  }
+
+  button{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 13px 18px;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color .15s ease, transform .1s ease, opacity .15s ease;
+  }
+  button:hover{ border-color: var(--accent); }
+  button:active{ transform: scale(0.98); }
+  button.primary{
+    background: var(--accent);
+    color: #1a0e0a;
+    border-color: var(--accent);
+    font-weight: 700;
+  }
+  button:disabled{
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  button.ghost{
+    background: transparent;
+    border-color: var(--line);
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 10px;
+  }
+
+  .menu-options{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .color-grid{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .color-swatch{
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: transform .1s ease, border-color .15s ease;
+  }
+  .color-swatch:active{ transform: scale(0.94); }
+  .color-swatch.selected{ border-color: var(--text); }
+  .color-swatch.taken{ opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+  .color-swatch.selected::after{
+    content: '✓';
+    color: #fff;
+    font-weight: 800;
+    font-size: 20px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  }
+  .color-swatch[data-color="rojo"]{ background: var(--red); }
+  .color-swatch[data-color="azul"]{ background: var(--blue); }
+  .color-swatch[data-color="verde"]{ background: var(--green); }
+  .color-swatch[data-color="amarillo"]{ background: var(--yellow); }
+
+  .room-code-display{
+    text-align: center;
+    padding: 18px 0 6px;
+  }
+  .room-code-display .label{
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .room-code-display .code{
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 46px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+  .room-code-display .hint{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .player-list{
+    list-style: none;
+    margin: 0 0 18px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .player-row{
+    display:flex;
+    align-items:center;
+    gap: 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .player-dot{
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .player-dot.rojo{ background: var(--red); }
+  .player-dot.azul{ background: var(--blue); }
+  .player-dot.verde{ background: var(--green); }
+  .player-dot.amarillo{ background: var(--yellow); }
+  .player-row .you-tag{
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .player-row .host-tag{
+    font-size: 13px;
+  }
+
+  .error-msg{
+    color: var(--accent);
+    font-size: 13px;
+    margin: -8px 0 14px;
+    min-height: 16px;
+  }
+
+  .waiting-note{
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- PANTALLA: MENU PRINCIPAL -->
+  <div class="screen active" id="screen-menu">
+    <h1>Secuencia<span>.</span></h1>
+    <div class="subtitle">Tablero de 12×12 · 2 a 4 jugadores</div>
+    <div class="menu-options">
+      <button class="primary" id="btn-goto-create">Crear sala</button>
+      <button id="btn-goto-join">Unirme con código</button>
+    </div>
+  </div>
+
+  <!-- PANTALLA: CREAR SALA -->
+  <div class="screen" id="screen-create">
+    <h2>Crear sala</h2>
+    <div class="card">
+      <label for="input-name-create">Tu nombre</label>
+      <input type="text" id="input-name-create" maxlength="16" placeholder="Ej: Hugo">
+      <label>Elegí tu color</label>
+      <div class="color-grid" id="color-grid-create">
+        <div class="color-swatch" data-color="rojo"></div>
+        <div class="color-swatch" data-color="azul"></div>
+        <div class="color-swatch" data-color="verde"></div>
+        <div class="color-swatch" data-color="amarillo"></div>
+      </div>
+      <div class="error-msg" id="error-create"></div>
+      <button class="primary" id="btn-create-confirm">Crear sala</button>
+    </div>
+    <button class="ghost" id="btn-back-1">← Volver</button>
+  </div>
+
+  <!-- PANTALLA: UNIRSE A SALA -->
+  <div class="screen" id="screen-join">
+    <h2>Unirme a una sala</h2>
+    <div class="card">
+      <label for="input-code-join">Código de sala</label>
+      <input type="text" id="input-code-join" class="code-input" maxlength="4" placeholder="XXXX">
+      <label for="input-name-join">Tu nombre</label>
+      <input type="text" id="input-name-join" maxlength="16" placeholder="Ej: Manuel">
+      <label>Elegí tu color</label>
+      <div class="color-grid" id="color-grid-join">
+        <div class="color-swatch" data-color="rojo"></div>
+        <div class="color-swatch" data-color="azul"></div>
+        <div class="color-swatch" data-color="verde"></div>
+        <div class="color-swatch" data-color="amarillo"></div>
+      </div>
+      <div class="error-msg" id="error-join"></div>
+      <button class="primary" id="btn-join-confirm">Unirme</button>
+    </div>
+    <button class="ghost" id="btn-back-2">← Volver</button>
+  </div>
+
+  <!-- PANTALLA: SALA DE ESPERA -->
+  <div class="screen" id="screen-lobby">
+    <div class="room-code-display">
+      <div class="label">Código de sala</div>
+      <div class="code" id="lobby-code">----</div>
+      <div class="hint">Compartilo con los demás jugadores</div>
+    </div>
+    <div class="card">
+      <h2 id="lobby-players-title">Jugadores (0/4)</h2>
+      <ul class="player-list" id="lobby-player-list"></ul>
+      <button class="primary" id="btn-start-game" disabled>Iniciar partida</button>
+      <div class="waiting-note" id="lobby-waiting-note">Esperando al host para arrancar…</div>
+    </div>
+    <button class="ghost" id="btn-leave-room">Salir de la sala</button>
+  </div>
+
+</div>
+
+<script>
+  // ---------- Firebase ----------
+  const firebaseConfig = {
+    apiKey: "AIzaSyBonA5cofQCH5r3i8oJZSIhQosSMGSg_5U",
+    authDomain: "unanime-71f1d.firebaseapp.com",
+    databaseURL: "https://unanime-71f1d-default-rtdb.firebaseio.com",
+    projectId: "unanime-71f1d",
+    storageBucket: "unanime-71f1d.firebasestorage.app",
+    messagingSenderId: "298284514922",
+    appId: "1:298284514922:web:fa218b28dbc0e3560bd413"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const ROOT = 'secuencia';
+
+  // ---------- Estado local ----------
+  let myPlayerId = sessionStorage.getItem('secuencia_playerId');
+  if (!myPlayerId){
+    myPlayerId = 'p_' + Math.random().toString(36).slice(2, 10);
+    sessionStorage.setItem('secuencia_playerId', myPlayerId);
+  }
+  let currentRoomCode = sessionStorage.getItem('secuencia_roomCode') || null;
+  let selectedColorCreate = null;
+  let selectedColorJoin = null;
+  let roomListener = null;
+  let isHost = false;
+
+  const COLORS = ['rojo', 'azul', 'verde', 'amarillo'];
+
+  // ---------- Navegación ----------
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  document.getElementById('btn-goto-create').addEventListener('click', () => showScreen('screen-create'));
+  document.getElementById('btn-goto-join').addEventListener('click', () => showScreen('screen-join'));
+  document.getElementById('btn-back-1').addEventListener('click', () => showScreen('screen-menu'));
+  document.getElementById('btn-back-2').addEventListener('click', () => showScreen('screen-menu'));
+
+  // ---------- Selección de color ----------
+  function setupColorGrid(gridId, onSelect){
+    const grid = document.getElementById(gridId);
+    grid.querySelectorAll('.color-swatch').forEach(sw => {
+      sw.addEventListener('click', () => {
+        if (sw.classList.contains('taken')) return;
+        grid.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        sw.classList.add('selected');
+        onSelect(sw.dataset.color);
+      });
+    });
+  }
+  setupColorGrid('color-grid-create', (c) => { selectedColorCreate = c; });
+  setupColorGrid('color-grid-join', (c) => { selectedColorJoin = c; });
+
+  function generateRoomCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
+
+  // ---------- Crear sala ----------
+  document.getElementById('btn-create-confirm').addEventListener('click', async () => {
+    const name = document.getElementById('input-name-create').value.trim();
+    const errorEl = document.getElementById('error-create');
+    errorEl.textContent = '';
+
+    if (!name){ errorEl.textContent = 'Poné tu nombre.'; return; }
+    if (!selectedColorCreate){ errorEl.textContent = 'Elegí un color.'; return; }
+
+    const code = generateRoomCode();
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+
+    const roomData = {
+      status: 'lobby',
+      host: myPlayerId,
+      createdAt: firebase.database.ServerValue.TIMESTAMP,
+      players: {
+        [myPlayerId]: {
+          name: name,
+          color: selectedColorCreate,
+          order: 0,
+          joinedAt: firebase.database.ServerValue.TIMESTAMP
+        }
+      }
+    };
+
+    try{
+      await roomRef.set(roomData);
+      currentRoomCode = code;
+      isHost = true;
+      sessionStorage.setItem('secuencia_roomCode', code);
+      sessionStorage.setItem('secuencia_isHost', '1');
+      enterLobby(code);
+    } catch(e){
+      errorEl.textContent = 'Error al crear la sala. Probá de nuevo.';
+      console.error(e);
+    }
+  });
+
+  // ---------- Unirse a sala ----------
+  const codeInput = document.getElementById('input-code-join');
+  codeInput.addEventListener('input', () => {
+    codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+
+  document.getElementById('btn-join-confirm').addEventListener('click', async () => {
+    const code = codeInput.value.trim().toUpperCase();
+    const name = document.getElementById('input-name-join').value.trim();
+    const errorEl = document.getElementById('error-join');
+    errorEl.textContent = '';
+
+    if (!code || code.length !== 4){ errorEl.textContent = 'Ingresá el código de 4 caracteres.'; return; }
+    if (!name){ errorEl.textContent = 'Poné tu nombre.'; return; }
+    if (!selectedColorJoin){ errorEl.textContent = 'Elegí un color.'; return; }
+
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    try{
+      const snap = await roomRef.get();
+      if (!snap.exists()){ errorEl.textContent = 'No existe esa sala.'; return; }
+      const room = snap.val();
+
+      if (room.status !== 'lobby'){ errorEl.textContent = 'Esa partida ya empezó.'; return; }
+
+      const existingPlayers = room.players || {};
+      const playerCount = Object.keys(existingPlayers).length;
+      if (playerCount >= 4 && !existingPlayers[myPlayerId]){
+        errorEl.textContent = 'La sala ya está completa (4 jugadores).';
+        return;
+      }
+      const takenColors = Object.values(existingPlayers).map(p => p.color);
+      if (takenColors.includes(selectedColorJoin) && !(existingPlayers[myPlayerId] && existingPlayers[myPlayerId].color === selectedColorJoin)){
+        errorEl.textContent = 'Ese color ya está en uso.';
+        return;
+      }
+
+      await roomRef.child(`players/${myPlayerId}`).set({
+        name: name,
+        color: selectedColorJoin,
+        order: playerCount,
+        joinedAt: firebase.database.ServerValue.TIMESTAMP
+      });
+
+      currentRoomCode = code;
+      isHost = (room.host === myPlayerId);
+      sessionStorage.setItem('secuencia_roomCode', code);
+      sessionStorage.setItem('secuencia_isHost', isHost ? '1' : '0');
+      enterLobby(code);
+    } catch(e){
+      errorEl.textContent = 'Error al unirse. Probá de nuevo.';
+      console.error(e);
+    }
+  });
+
+  // ---------- Sala de espera ----------
+  function enterLobby(code){
+    showScreen('screen-lobby');
+    document.getElementById('lobby-code').textContent = code;
+
+    if (roomListener) roomListener();
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    const listener = roomRef.on('value', (snap) => {
+      const room = snap.val();
+      if (!room){
+        alert('La sala fue cerrada.');
+        leaveRoom();
+        return;
+      }
+      renderLobby(room, code);
+
+      if (room.status === 'playing'){
+        // Acá se conecta la Parte 2: pantalla de juego
+        showScreen('screen-lobby');
+        document.getElementById('lobby-waiting-note').textContent = '¡La partida arrancó! (pantalla de juego: próxima parte)';
+      }
+    });
+    roomListener = () => roomRef.off('value', listener);
+  }
+
+  function renderLobby(room, code){
+    const players = room.players || {};
+    const playerIds = Object.keys(players).sort((a, b) => (players[a].order || 0) - (players[b].order || 0));
+
+    document.getElementById('lobby-players-title').textContent = `Jugadores (${playerIds.length}/4)`;
+
+    const list = document.getElementById('lobby-player-list');
+    list.innerHTML = '';
+    playerIds.forEach(pid => {
+      const p = players[pid];
+      const li = document.createElement('li');
+      li.className = 'player-row';
+      const isYou = pid === myPlayerId;
+      const isRoomHost = pid === room.host;
+      li.innerHTML = `
+        <span class="player-dot ${p.color}"></span>
+        <span>${p.name}</span>
+        ${isRoomHost ? '<span class="host-tag">👑</span>' : ''}
+        ${isYou ? '<span class="you-tag">Vos</span>' : ''}
+      `;
+      list.appendChild(li);
+    });
+
+    const startBtn = document.getElementById('btn-start-game');
+    const waitingNote = document.getElementById('lobby-waiting-note');
+    const amHost = room.host === myPlayerId;
+
+    if (amHost){
+      startBtn.style.display = 'block';
+      startBtn.disabled = playerIds.length < 2;
+      waitingNote.textContent = playerIds.length < 2 ? 'Necesitás al menos 2 jugadores.' : 'Listo para arrancar.';
+    } else {
+      startBtn.style.display = 'none';
+      waitingNote.textContent = 'Esperando a que el host inicie la partida…';
+    }
+  }
+
+  document.getElementById('btn-start-game').addEventListener('click', async () => {
+    if (!currentRoomCode) return;
+    await db.ref(`${ROOT}/rooms/${currentRoomCode}/status`).set('playing');
+    // La lógica de armar tablero + mazo + repartir cartas se agrega en la Parte 2
+  });
+
+  document.getElementById('btn-leave-room').addEventListener('click', leaveRoom);
+
+  async function leaveRoom(){
+    if (roomListener) roomListener();
+    roomListener = null;
+    if (currentRoomCode){
+      try{
+        const roomRef = db.ref(`${ROOT}/rooms/${currentRoomCode}`);
+        const snap = await roomRef.child('players').get();
+        const players = snap.val() || {};
+        delete players[myPlayerId];
+        if (Object.keys(players).length === 0){
+          await roomRef.remove();
+        } else {
+          await roomRef.child(`players/${myPlayerId}`).remove();
+          // Si el host se va, pasa el rol al siguiente jugador
+          const roomSnap = await roomRef.get();
+          const room = roomSnap.val();
+          if (room && room.host === myPlayerId){
+            const nextId = Object.keys(players)[0];
+            await roomRef.child('host').set(nextId);
+          }
+        }
+      } catch(e){ console.error(e); }
+    }
+    sessionStorage.removeItem('secuencia_roomCode');
+    sessionStorage.removeItem('secuencia_isHost');
+    currentRoomCode = null;
+    showScreen('screen-menu');
+  }
+
+  // ---------- Reconexión automática ----------
+  if (currentRoomCode){
+    isHost = sessionStorage.getItem('secuencia_isHost') === '1';
+    enterLobby(currentRoomCode);
+  }
+</script>
+</body>
+</html>
