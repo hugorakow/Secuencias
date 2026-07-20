@@ -336,6 +336,12 @@
   .gcell.in-sequence .piece{
     box-shadow: 0 0 0 2px #ffd76b, 0 1px 3px rgba(0,0,0,0.5);
   }
+  .gcell.last-move .piece{
+    box-shadow: 0 0 0 2px #fff, 0 1px 4px rgba(0,0,0,0.6);
+  }
+  .gcell.last-move.in-sequence .piece{
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ffd76b, 0 1px 4px rgba(0,0,0,0.6);
+  }
 
   .hand-section{
     margin-bottom: 10px;
@@ -405,27 +411,34 @@
   .player-chip.active-turn{ border-color: var(--accent); }
   .player-chip .n{ color: var(--text-dim); }
 
-  .winner-overlay{
-    position: fixed;
-    inset: 0;
-    background: rgba(13,15,20,0.92);
+  .winner-banner{
     display:flex;
     align-items:center;
-    justify-content:center;
-    z-index: 50;
-    padding: 20px;
+    gap: 14px;
+    background: linear-gradient(135deg, #2a2210, #1a1e28);
+    border: 1px solid #ffd76b;
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
   }
-  .winner-card{
-    background: var(--panel);
-    border: 1px solid var(--accent);
-    border-radius: 18px;
-    padding: 36px 28px;
-    text-align: center;
-    max-width: 340px;
+  .winner-banner .trophy{ font-size: 34px; flex-shrink: 0; }
+  .winner-banner .winner-text{ flex: 1; min-width: 0; }
+  .winner-banner #winner-title{
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 17px;
+    margin: 0 0 2px;
   }
-  .winner-card .trophy{ font-size: 48px; margin-bottom: 10px; }
-  .winner-card h2{ margin-bottom: 6px; }
-  .winner-card p{ color: var(--text-dim); font-size: 14px; margin-bottom: 22px; }
+  .winner-banner #winner-subtitle{
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+  .winner-banner button{
+    width: auto;
+    flex-shrink: 0;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -499,6 +512,15 @@
 
   <!-- PANTALLA: JUEGO -->
   <div class="screen" id="screen-game">
+    <div class="winner-banner" id="winner-banner" style="display:none;">
+      <div class="trophy">🏆</div>
+      <div class="winner-text">
+        <div id="winner-title">¡Ganó!</div>
+        <div id="winner-subtitle"></div>
+      </div>
+      <button class="primary" id="btn-winner-menu">Volver al menú</button>
+    </div>
+
     <div class="players-strip" id="game-players-strip"></div>
 
     <div class="game-topbar">
@@ -515,22 +537,12 @@
 
     <div class="action-hint" id="action-hint">Tocá una carta de tu mano.</div>
 
-    <div class="hand-section">
+    <div class="hand-section" id="hand-section">
       <div class="hand-label">Tu mano</div>
       <div class="hand-row" id="hand-row"></div>
     </div>
   </div>
 
-</div>
-
-<!-- OVERLAY GANADOR -->
-<div class="winner-overlay" id="winner-overlay" style="display:none;">
-  <div class="winner-card">
-    <div class="trophy">🏆</div>
-    <h2 id="winner-title">¡Ganó!</h2>
-    <p id="winner-subtitle"></p>
-    <button class="primary" id="btn-winner-menu">Volver al menú</button>
-  </div>
 </div>
 
 <script>
@@ -980,20 +992,28 @@
           targetIndices = free;
           pendingMode = 'place';
         } else {
-          const rival = symIdx.filter(i => cells[i] && cells[i] !== myColor);
+          const rival = symIdx.filter(i => cells[i] && cells[i] !== myColor && !seqHighlighted.has(i));
           if (rival.length > 0){
             targetIndices = rival;
             pendingMode = 'replace';
           }
         }
       } else if (selectedCard.type === 'devil'){
-        targetIndices = cells.map((c, i) => (c && c !== myColor) ? i : -1).filter(i => i >= 0);
+        targetIndices = cells.map((c, i) => (c && c !== myColor && !seqHighlighted.has(i)) ? i : -1).filter(i => i >= 0);
         pendingMode = 'devil';
       } else if (selectedCard.type === 'angel'){
-        targetIndices = cells.map((c, i) => (c !== myColor) ? i : -1).filter(i => i >= 0);
+        targetIndices = cells.map((c, i) => (!c || (c !== myColor && !seqHighlighted.has(i))) ? i : -1).filter(i => i >= 0);
         pendingMode = 'angel';
       }
     }
+
+    // Última ficha colocada por cada color, para resaltarla
+    const lastMoveByColor = room.lastMoveByColor || {};
+    const lastMoveIndices = new Set();
+    Object.keys(lastMoveByColor).forEach(color => {
+      const idx = lastMoveByColor[color];
+      if (cells[idx] === color) lastMoveIndices.add(idx);
+    });
 
     boardEl.innerHTML = '';
     for (let i = 0; i < 144; i++){
@@ -1007,6 +1027,9 @@
       }
       if (seqHighlighted.has(i)){
         cell.classList.add('in-sequence');
+      }
+      if (lastMoveIndices.has(i)){
+        cell.classList.add('last-move');
       }
       if (targetIndices.includes(i)){
         cell.classList.add('targetable');
@@ -1022,7 +1045,9 @@
     } else if (!selectedCard){
       hintEl.innerHTML = 'Tocá una carta de tu mano para jugarla.';
     } else if (selectedCard.type === 'symbol' && targetIndices.length === 0){
-      hintEl.innerHTML = 'Ya tenés fichas tuyas en los 2 casilleros de ese dibujo. Tocá la carta de nuevo para descartarla y robar otra.';
+      hintEl.innerHTML = 'Ya tenés fichas tuyas ahí, o la única ficha rival está en una secuencia protegida. Tocá la carta de nuevo para descartarla y robar otra.';
+    } else if (selectedCard.type === 'devil' && targetIndices.length === 0){
+      hintEl.innerHTML = '😈 No hay fichas rivales para sacar (están todas en secuencias protegidas). Tocá la carta de nuevo para descartarla y robar otra.';
     } else if (pendingMode === 'place'){
       hintEl.innerHTML = 'Tocá el casillero resaltado para poner tu ficha.';
     } else if (pendingMode === 'replace'){
@@ -1050,13 +1075,20 @@
       cardEl.addEventListener('click', () => {
         if (!isMyTurn) return;
         if (selectedCardIndex === idx){
-          // Segundo toque en carta sin destino (mano llena en su propio símbolo): descartar y robar
+          // Segundo toque en carta sin destino válido: descartar y robar
           if (card.type === 'symbol'){
             const symIdx = [];
             board.forEach((s, i) => { if (s === card.value) symIdx.push(i); });
             const hasFree = symIdx.some(i => !cells[i]);
-            const hasRival = symIdx.some(i => cells[i] && cells[i] !== myColor);
+            const hasRival = symIdx.some(i => cells[i] && cells[i] !== myColor && !seqHighlighted.has(i));
             if (!hasFree && !hasRival){
+              discardAndDraw(room, code, idx);
+              selectedCardIndex = null;
+              return;
+            }
+          } else if (card.type === 'devil'){
+            const hasTarget = cells.some((c, i) => c && c !== myColor && !seqHighlighted.has(i));
+            if (!hasTarget){
               discardAndDraw(room, code, idx);
               selectedCardIndex = null;
               return;
@@ -1072,14 +1104,18 @@
     });
 
     // Ganador
-    const winnerOverlay = document.getElementById('winner-overlay');
+    const winnerBanner = document.getElementById('winner-banner');
+    const handSection = document.getElementById('hand-section');
     if (room.status === 'finished' && room.winnerId){
       const w = players[room.winnerId];
       document.getElementById('winner-title').textContent = w ? `¡Ganó ${w.name}!` : '¡Partida terminada!';
-      document.getElementById('winner-subtitle').textContent = w ? `Ficha ${w.color}` : '';
-      winnerOverlay.style.display = 'flex';
+      document.getElementById('winner-subtitle').textContent = w ? `Ficha ${w.color} — completó 2 secuencias` : '';
+      winnerBanner.style.display = 'flex';
+      handSection.style.display = 'none';
+      hintEl.textContent = 'Partida terminada.';
     } else {
-      winnerOverlay.style.display = 'none';
+      winnerBanner.style.display = 'none';
+      handSection.style.display = '';
     }
   }
 
@@ -1161,6 +1197,9 @@
       discard: newDiscard,
       turnIndex: nextIndex
     };
+    if (mode !== 'devil'){
+      updates[`lastMoveByColor/${myColor}`] = cellIndex;
+    }
     if (winnerId){
       updates.status = 'finished';
       updates.winnerId = winnerId;
@@ -1171,7 +1210,7 @@
   }
 
   document.getElementById('btn-winner-menu').addEventListener('click', async () => {
-    document.getElementById('winner-overlay').style.display = 'none';
+    document.getElementById('winner-banner').style.display = 'none';
     await leaveRoom();
   });
 
