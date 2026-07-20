@@ -330,6 +330,12 @@
     cursor: pointer;
   }
   .gcell.targetable:active{ transform: scale(0.92); }
+  .gcell.in-sequence{
+    box-shadow: 0 0 0 2px #ffd76b inset;
+  }
+  .gcell.in-sequence .piece{
+    box-shadow: 0 0 0 2px #ffd76b, 0 1px 3px rgba(0,0,0,0.5);
+  }
 
   .hand-section{
     margin-bottom: 10px;
@@ -801,10 +807,10 @@
     for (let i = 0; i < 3; i++) deck.push({ type: 'angel', value: '😇' });
     deck = shuffleArr(deck);
 
-    // Repartir 6 cartas a cada jugador
+    // Repartir 7 cartas a cada jugador
     const hands = {};
     playerIds.forEach(pid => {
-      hands[pid] = deck.splice(0, 6);
+      hands[pid] = deck.splice(0, 7);
     });
 
     const updates = {
@@ -859,36 +865,41 @@
   }
   const BOARD_LINES = getLines();
 
-  function findWinner(cells, colorsInPlay){
+  function analyzeBoard(cells, colorsInPlay){
     const counts = {};
     colorsInPlay.forEach(c => counts[c] = 0);
+    const highlighted = new Set();
 
     BOARD_LINES.forEach(line => {
       let runColor = null;
       let runLen = 0;
-      const flushRun = () => {
+      let runStart = 0;
+      const flush = (endExclusive) => {
         if (runColor && runLen >= 5){
-          counts[runColor] = (counts[runColor] || 0) + (Math.floor((runLen - 5) / 4) + 1);
+          counts[runColor] = (counts[runColor] || 0) + Math.max(0, runLen - 4);
+          for (let k = runStart; k < endExclusive; k++) highlighted.add(line[k]);
         }
-        runColor = null; runLen = 0;
       };
-      line.forEach(idx => {
+      line.forEach((idx, i) => {
         const c = cells[idx];
         if (c && c === runColor){
           runLen++;
         } else {
-          flushRun();
+          flush(i);
           runColor = c;
           runLen = c ? 1 : 0;
+          runStart = i;
         }
       });
-      flushRun();
+      flush(line.length);
     });
 
+    let winnerColor = null;
     for (const color of colorsInPlay){
-      if (counts[color] >= 2) return color;
+      if (counts[color] >= 2){ winnerColor = color; break; }
     }
-    return null;
+
+    return { counts, highlighted, winnerColor };
   }
 
   function renderGame(room, code){
@@ -928,6 +939,20 @@
     const cells = normalizeCells(room.cells);
     const boardEl = document.getElementById('game-board');
 
+    const colorsInPlay = turnOrder.map(pid => players[pid] && players[pid].color).filter(Boolean);
+    const { counts: seqCounts, highlighted: seqHighlighted } = analyzeBoard(cells, colorsInPlay);
+
+    // Actualizar franja de jugadores con el conteo de secuencias
+    turnOrder.forEach((pid, chipIdx) => {
+      const p = players[pid];
+      if (!p) return;
+      const n = seqCounts[p.color] || 0;
+      if (n > 0){
+        const chip = strip.children[chipIdx];
+        if (chip) chip.innerHTML += `<span class="n">🔗${n}/2</span>`;
+      }
+    });
+
     let targetIndices = [];
     let pendingMode = null; // 'place' | 'replace' | 'devil' | 'angel'
     const myHand = (players[myPlayerId] && players[myPlayerId].hand) || [];
@@ -966,6 +991,9 @@
         const piece = document.createElement('div');
         piece.className = 'piece ' + cells[i];
         cell.appendChild(piece);
+      }
+      if (seqHighlighted.has(i)){
+        cell.classList.add('in-sequence');
       }
       if (targetIndices.includes(i)){
         cell.classList.add('targetable');
@@ -1101,7 +1129,7 @@
     if (drawn) myHand.push(drawn);
 
     const colorsInPlay = turnOrder.map(pid => fresh.players[pid].color);
-    const winnerColor = findWinner(cells, colorsInPlay);
+    const { winnerColor } = analyzeBoard(cells, colorsInPlay);
     let winnerId = null;
     if (winnerColor){
       winnerId = turnOrder.find(pid => fresh.players[pid].color === winnerColor);
