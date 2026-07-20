@@ -244,6 +244,182 @@
     font-size: 13px;
     margin-top: 10px;
   }
+
+  /* ---------- PANTALLA DE JUEGO ---------- */
+  #screen-game{ max-width: 720px; margin: 0 auto; }
+  .game-topbar{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .turn-banner{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 14px;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    flex: 1;
+  }
+  .turn-banner.your-turn{
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .turn-dot{
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink:0;
+  }
+  .turn-dot.rojo{ background: var(--red); }
+  .turn-dot.azul{ background: var(--blue); }
+  .turn-dot.verde{ background: var(--green); }
+  .turn-dot.amarillo{ background: var(--yellow); }
+  .deck-count-pill{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .deck-count-pill b{ color: var(--text); }
+
+  .game-board-shell{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 8px;
+    margin-bottom: 14px;
+  }
+  .game-board{
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    gap: 2px;
+    aspect-ratio: 1/1;
+    width: 100%;
+  }
+  .gcell{
+    position: relative;
+    background: var(--panel-2);
+    border-radius: 3px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: clamp(8px, 1.5vw, 15px);
+    user-select: none;
+  }
+  .gcell:nth-child(odd){ background: #17191f; }
+  .gcell .piece{
+    position: absolute;
+    inset: 12%;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+  .gcell .piece.rojo{ background: var(--red); }
+  .gcell .piece.azul{ background: var(--blue); }
+  .gcell .piece.verde{ background: var(--green); }
+  .gcell .piece.amarillo{ background: var(--yellow); }
+  .gcell.targetable{
+    background: var(--accent-dim);
+    box-shadow: 0 0 0 2px var(--accent) inset;
+    cursor: pointer;
+  }
+  .gcell.targetable:active{ transform: scale(0.92); }
+
+  .hand-section{
+    margin-bottom: 10px;
+  }
+  .hand-label{
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+  .hand-row{
+    display:flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .hand-card{
+    flex-shrink: 0;
+    width: 56px;
+    height: 78px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 26px;
+    cursor: pointer;
+    transition: transform .12s ease, border-color .15s ease;
+  }
+  .hand-card:active{ transform: scale(0.94); }
+  .hand-card.selected{
+    border-color: var(--accent);
+    transform: translateY(-6px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+  }
+  .hand-card.special.devil{ background: var(--devil-dim, #3a1e26); border-color: var(--devil, #ff4a6b); }
+  .hand-card.special.angel{ background: var(--angel-dim, #3a3120); border-color: var(--angel, #ffd76b); }
+  .hand-card.disabled{ opacity: 0.4; cursor: not-allowed; }
+
+  .action-hint{
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    min-height: 18px;
+    margin-bottom: 8px;
+  }
+  .action-hint b{ color: var(--accent); }
+
+  .players-strip{
+    display:flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .player-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .player-chip.active-turn{ border-color: var(--accent); }
+  .player-chip .n{ color: var(--text-dim); }
+
+  .winner-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(13,15,20,0.92);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index: 50;
+    padding: 20px;
+  }
+  .winner-card{
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 18px;
+    padding: 36px 28px;
+    text-align: center;
+    max-width: 340px;
+  }
+  .winner-card .trophy{ font-size: 48px; margin-bottom: 10px; }
+  .winner-card h2{ margin-bottom: 6px; }
+  .winner-card p{ color: var(--text-dim); font-size: 14px; margin-bottom: 22px; }
 </style>
 </head>
 <body>
@@ -315,6 +491,40 @@
     <button class="ghost" id="btn-leave-room">Salir de la sala</button>
   </div>
 
+  <!-- PANTALLA: JUEGO -->
+  <div class="screen" id="screen-game">
+    <div class="players-strip" id="game-players-strip"></div>
+
+    <div class="game-topbar">
+      <div class="turn-banner" id="turn-banner">
+        <span class="turn-dot" id="turn-dot"></span>
+        <span id="turn-text">Cargando…</span>
+      </div>
+      <div class="deck-count-pill">Mazo: <b id="deck-count">-</b></div>
+    </div>
+
+    <div class="game-board-shell">
+      <div class="game-board" id="game-board"></div>
+    </div>
+
+    <div class="action-hint" id="action-hint">Tocá una carta de tu mano.</div>
+
+    <div class="hand-section">
+      <div class="hand-label">Tu mano</div>
+      <div class="hand-row" id="hand-row"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- OVERLAY GANADOR -->
+<div class="winner-overlay" id="winner-overlay" style="display:none;">
+  <div class="winner-card">
+    <div class="trophy">🏆</div>
+    <h2 id="winner-title">¡Ganó!</h2>
+    <p id="winner-subtitle"></p>
+    <button class="primary" id="btn-winner-menu">Volver al menú</button>
+  </div>
 </div>
 
 <script>
@@ -486,12 +696,11 @@
         leaveRoom();
         return;
       }
-      renderLobby(room, code);
 
-      if (room.status === 'playing'){
-        // Acá se conecta la Parte 2: pantalla de juego
-        showScreen('screen-lobby');
-        document.getElementById('lobby-waiting-note').textContent = '¡La partida arrancó! (pantalla de juego: próxima parte)';
+      if (room.status === 'playing' || room.status === 'finished'){
+        renderGame(room, code);
+      } else {
+        renderLobby(room, code);
       }
     });
     roomListener = () => roomRef.off('value', listener);
@@ -534,10 +743,378 @@
     }
   }
 
+  const SYMBOLS_POOL = [
+    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
+    '🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🦆','🦅',
+    '🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌',
+    '🐞','🐜','🦗','🕷️','🐢','🐍','🦎','🐙','🦑','🦀',
+    '🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🦓','🦍',
+    '🐘','🦛','🦏','🐪','🐫','🦒','🦘','🐃','🐂','🐄',
+    '🐎','🐖','🐑','🐐','🦌','🐕','🍎','🍊','🍋','🍇',
+    '🍓','🍒','🍍','🥑','🌽','🍄','🌵','🌸','🌻','🍀',
+    '⚽','🏀','🎸','🎨','🎲','🚀','⚓','🔥','⭐','❄️'
+  ];
+
+  function shuffleArr(arr){
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   document.getElementById('btn-start-game').addEventListener('click', async () => {
     if (!currentRoomCode) return;
-    await db.ref(`${ROOT}/rooms/${currentRoomCode}/status`).set('playing');
-    // La lógica de armar tablero + mazo + repartir cartas se agrega en la Parte 2
+    const roomRef = db.ref(`${ROOT}/rooms/${currentRoomCode}`);
+    const snap = await roomRef.get();
+    const room = snap.val();
+    if (!room) return;
+
+    const players = room.players || {};
+    const playerIds = Object.keys(players).sort((a, b) => (players[a].order || 0) - (players[b].order || 0));
+
+    // Tablero: 72 dibujos x2, al azar
+    const symbols = SYMBOLS_POOL.slice(0, 72);
+    const board = shuffleArr([...symbols, ...symbols]);
+
+    // Mazo: 144 cartas (mismos dibujos x2) + 3 diablo + 3 ángel
+    let deck = [];
+    symbols.forEach(s => {
+      deck.push({ type: 'symbol', value: s });
+      deck.push({ type: 'symbol', value: s });
+    });
+    for (let i = 0; i < 3; i++) deck.push({ type: 'devil', value: '😈' });
+    for (let i = 0; i < 3; i++) deck.push({ type: 'angel', value: '😇' });
+    deck = shuffleArr(deck);
+
+    // Repartir 6 cartas a cada jugador
+    const hands = {};
+    playerIds.forEach(pid => {
+      hands[pid] = deck.splice(0, 6);
+    });
+
+    const updates = {
+      status: 'playing',
+      board: board,
+      cells: new Array(144).fill(null),
+      deck: deck,
+      discard: [],
+      turnOrder: playerIds,
+      turnIndex: 0
+    };
+    playerIds.forEach(pid => {
+      updates[`players/${pid}/hand`] = hands[pid];
+    });
+
+    await roomRef.update(updates);
+  });
+
+  // ========== LÓGICA DE JUEGO ==========
+  let selectedCardIndex = null;
+  let lastRenderedStatus = null;
+
+  function getLines(){
+    const lines = [];
+    for (let r = 0; r < 12; r++){
+      const line = [];
+      for (let c = 0; c < 12; c++) line.push(r * 12 + c);
+      lines.push(line);
+    }
+    for (let c = 0; c < 12; c++){
+      const line = [];
+      for (let r = 0; r < 12; r++) line.push(r * 12 + c);
+      lines.push(line);
+    }
+    for (let startCol = -7; startCol <= 11; startCol++){
+      const line = [];
+      for (let r = 0; r < 12; r++){
+        const c = r + startCol;
+        if (c >= 0 && c < 12) line.push(r * 12 + c);
+      }
+      if (line.length >= 5) lines.push(line);
+    }
+    for (let startCol = 0; startCol <= 18; startCol++){
+      const line = [];
+      for (let r = 0; r < 12; r++){
+        const c = startCol - r;
+        if (c >= 0 && c < 12) line.push(r * 12 + c);
+      }
+      if (line.length >= 5) lines.push(line);
+    }
+    return lines;
+  }
+  const BOARD_LINES = getLines();
+
+  function findWinner(cells, colorsInPlay){
+    const counts = {};
+    colorsInPlay.forEach(c => counts[c] = 0);
+
+    BOARD_LINES.forEach(line => {
+      let runColor = null;
+      let runLen = 0;
+      const flushRun = () => {
+        if (runColor && runLen >= 5){
+          counts[runColor] = (counts[runColor] || 0) + (Math.floor((runLen - 5) / 4) + 1);
+        }
+        runColor = null; runLen = 0;
+      };
+      line.forEach(idx => {
+        const c = cells[idx];
+        if (c && c === runColor){
+          runLen++;
+        } else {
+          flushRun();
+          runColor = c;
+          runLen = c ? 1 : 0;
+        }
+      });
+      flushRun();
+    });
+
+    for (const color of colorsInPlay){
+      if (counts[color] >= 2) return color;
+    }
+    return null;
+  }
+
+  function renderGame(room, code){
+    showScreen('screen-game');
+    const players = room.players || {};
+    const turnOrder = room.turnOrder || [];
+    const currentTurnId = turnOrder[room.turnIndex] || null;
+    const myColor = players[myPlayerId] ? players[myPlayerId].color : null;
+
+    // Franja de jugadores
+    const strip = document.getElementById('game-players-strip');
+    strip.innerHTML = '';
+    turnOrder.forEach(pid => {
+      const p = players[pid];
+      if (!p) return;
+      const chip = document.createElement('div');
+      chip.className = 'player-chip' + (pid === currentTurnId ? ' active-turn' : '');
+      chip.innerHTML = `<span class="turn-dot ${p.color}"></span>${p.name}<span class="n">${(p.hand || []).length}🎴</span>`;
+      strip.appendChild(chip);
+    });
+
+    // Turno
+    const isMyTurn = currentTurnId === myPlayerId;
+    const banner = document.getElementById('turn-banner');
+    const turnDot = document.getElementById('turn-dot');
+    const turnText = document.getElementById('turn-text');
+    if (currentTurnId && players[currentTurnId]){
+      turnDot.className = 'turn-dot ' + players[currentTurnId].color;
+      turnText.textContent = isMyTurn ? 'Es tu turno' : `Turno de ${players[currentTurnId].name}`;
+    }
+    banner.classList.toggle('your-turn', isMyTurn);
+
+    document.getElementById('deck-count').textContent = (room.deck || []).length;
+
+    // Tablero
+    const board = room.board || [];
+    const cells = room.cells || new Array(144).fill(null);
+    const boardEl = document.getElementById('game-board');
+
+    let targetIndices = [];
+    let pendingMode = null; // 'place' | 'replace' | 'devil' | 'angel'
+    const myHand = (players[myPlayerId] && players[myPlayerId].hand) || [];
+    const selectedCard = (isMyTurn && selectedCardIndex !== null) ? myHand[selectedCardIndex] : null;
+
+    if (selectedCard){
+      if (selectedCard.type === 'symbol'){
+        const symIdx = [];
+        board.forEach((s, i) => { if (s === selectedCard.value) symIdx.push(i); });
+        const free = symIdx.filter(i => !cells[i]);
+        if (free.length > 0){
+          targetIndices = free;
+          pendingMode = 'place';
+        } else {
+          const rival = symIdx.filter(i => cells[i] && cells[i] !== myColor);
+          if (rival.length > 0){
+            targetIndices = rival;
+            pendingMode = 'replace';
+          }
+        }
+      } else if (selectedCard.type === 'devil'){
+        targetIndices = cells.map((c, i) => (c && c !== myColor) ? i : -1).filter(i => i >= 0);
+        pendingMode = 'devil';
+      } else if (selectedCard.type === 'angel'){
+        targetIndices = cells.map((c, i) => (c !== myColor) ? i : -1).filter(i => i >= 0);
+        pendingMode = 'angel';
+      }
+    }
+
+    boardEl.innerHTML = '';
+    for (let i = 0; i < 144; i++){
+      const cell = document.createElement('div');
+      cell.className = 'gcell';
+      cell.textContent = board[i] || '';
+      if (cells[i]){
+        const piece = document.createElement('div');
+        piece.className = 'piece ' + cells[i];
+        cell.appendChild(piece);
+      }
+      if (targetIndices.includes(i)){
+        cell.classList.add('targetable');
+        cell.addEventListener('click', () => executeMove(room, code, i, pendingMode, selectedCard));
+      }
+      boardEl.appendChild(cell);
+    }
+
+    // Hint de acción
+    const hintEl = document.getElementById('action-hint');
+    if (!isMyTurn){
+      hintEl.innerHTML = 'Esperá tu turno.';
+    } else if (!selectedCard){
+      hintEl.innerHTML = 'Tocá una carta de tu mano para jugarla.';
+    } else if (selectedCard.type === 'symbol' && targetIndices.length === 0){
+      hintEl.innerHTML = 'Ya tenés fichas tuyas en los 2 casilleros de ese dibujo. Tocá la carta de nuevo para descartarla y robar otra.';
+    } else if (pendingMode === 'place'){
+      hintEl.innerHTML = 'Tocá el casillero resaltado para poner tu ficha.';
+    } else if (pendingMode === 'replace'){
+      hintEl.innerHTML = 'Ambos casilleros ocupados: tocá uno para <b>sacar</b> la ficha rival y poner la tuya.';
+    } else if (pendingMode === 'devil'){
+      hintEl.innerHTML = '😈 Tocá una ficha rival para sacarla del tablero.';
+    } else if (pendingMode === 'angel'){
+      hintEl.innerHTML = '😇 Tocá cualquier casillero para poner tu ficha.';
+    }
+
+    // Mano
+    const handRow = document.getElementById('hand-row');
+    handRow.innerHTML = '';
+    myHand.forEach((card, idx) => {
+      const cardEl = document.createElement('div');
+      cardEl.className = 'hand-card';
+      if (card.type !== 'symbol') cardEl.classList.add('special', card.type);
+      if (idx === selectedCardIndex) cardEl.classList.add('selected');
+      if (!isMyTurn) cardEl.classList.add('disabled');
+      cardEl.textContent = card.value;
+      cardEl.addEventListener('click', () => {
+        if (!isMyTurn) return;
+        if (selectedCardIndex === idx){
+          // Segundo toque en carta sin destino (mano llena en su propio símbolo): descartar y robar
+          if (card.type === 'symbol'){
+            const symIdx = [];
+            board.forEach((s, i) => { if (s === card.value) symIdx.push(i); });
+            const hasFree = symIdx.some(i => !cells[i]);
+            const hasRival = symIdx.some(i => cells[i] && cells[i] !== myColor);
+            if (!hasFree && !hasRival){
+              discardAndDraw(room, code, idx);
+              selectedCardIndex = null;
+              return;
+            }
+          }
+          selectedCardIndex = null;
+        } else {
+          selectedCardIndex = idx;
+        }
+        renderGame(room, code);
+      });
+      handRow.appendChild(cardEl);
+    });
+
+    // Ganador
+    const winnerOverlay = document.getElementById('winner-overlay');
+    if (room.status === 'finished' && room.winnerId){
+      const w = players[room.winnerId];
+      document.getElementById('winner-title').textContent = w ? `¡Ganó ${w.name}!` : '¡Partida terminada!';
+      document.getElementById('winner-subtitle').textContent = w ? `Ficha ${w.color}` : '';
+      winnerOverlay.style.display = 'flex';
+    } else {
+      winnerOverlay.style.display = 'none';
+    }
+  }
+
+  async function drawReplacement(roomSnapVal, deck, discard){
+    let newDeck = deck.slice();
+    let newDiscard = discard.slice();
+    if (newDeck.length === 0){
+      newDeck = shuffleArr(newDiscard);
+      newDiscard = [];
+    }
+    const drawn = newDeck.shift();
+    return { drawn, newDeck, newDiscard };
+  }
+
+  async function discardAndDraw(room, code, handIdx){
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    const snap = await roomRef.get();
+    const fresh = snap.val();
+    const myHand = (fresh.players[myPlayerId].hand || []).slice();
+    const playedCard = myHand.splice(handIdx, 1)[0];
+    let discard = (fresh.discard || []).slice();
+    discard.push(playedCard);
+
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh, fresh.deck || [], discard);
+    if (drawn) myHand.push(drawn);
+
+    const nextIndex = (fresh.turnIndex + 1) % fresh.turnOrder.length;
+
+    await roomRef.update({
+      [`players/${myPlayerId}/hand`]: myHand,
+      deck: newDeck,
+      discard: newDiscard,
+      turnIndex: nextIndex
+    });
+  }
+
+  async function executeMove(room, code, cellIndex, mode, card){
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    const snap = await roomRef.get();
+    const fresh = snap.val();
+    if (!fresh || fresh.status !== 'playing') return;
+
+    const turnOrder = fresh.turnOrder || [];
+    const currentTurnId = turnOrder[fresh.turnIndex];
+    if (currentTurnId !== myPlayerId) return;
+
+    const myColor = fresh.players[myPlayerId].color;
+    const cells = (fresh.cells || new Array(144).fill(null)).slice();
+    const myHand = (fresh.players[myPlayerId].hand || []).slice();
+    const handIdx = myHand.findIndex(c => c.type === card.type && c.value === card.value);
+    if (handIdx === -1) return;
+
+    if (mode === 'devil'){
+      cells[cellIndex] = null;
+    } else {
+      cells[cellIndex] = myColor;
+    }
+
+    const playedCard = myHand.splice(handIdx, 1)[0];
+    let discard = (fresh.discard || []).slice();
+    discard.push(playedCard);
+
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh, fresh.deck || [], discard);
+    if (drawn) myHand.push(drawn);
+
+    const colorsInPlay = turnOrder.map(pid => fresh.players[pid].color);
+    const winnerColor = findWinner(cells, colorsInPlay);
+    let winnerId = null;
+    if (winnerColor){
+      winnerId = turnOrder.find(pid => fresh.players[pid].color === winnerColor);
+    }
+
+    const nextIndex = (fresh.turnIndex + 1) % turnOrder.length;
+
+    const updates = {
+      cells: cells,
+      [`players/${myPlayerId}/hand`]: myHand,
+      deck: newDeck,
+      discard: newDiscard,
+      turnIndex: nextIndex
+    };
+    if (winnerId){
+      updates.status = 'finished';
+      updates.winnerId = winnerId;
+    }
+
+    selectedCardIndex = null;
+    await roomRef.update(updates);
+  }
+
+  document.getElementById('btn-winner-menu').addEventListener('click', async () => {
+    document.getElementById('winner-overlay').style.display = 'none';
+    await leaveRoom();
   });
 
   document.getElementById('btn-leave-room').addEventListener('click', leaveRoom);
