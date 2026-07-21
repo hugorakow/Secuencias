@@ -330,6 +330,18 @@
     cursor: pointer;
   }
   .gcell.targetable:active{ transform: scale(0.92); }
+  .gcell.preview-target{
+    box-shadow: 0 0 0 2px var(--accent) inset;
+    opacity: 0.85;
+  }
+  .gcell.move-source{
+    box-shadow: 0 0 0 2px #7dd3fc inset;
+    background: #12303e;
+    cursor: pointer;
+  }
+  .gcell.move-source-selected{
+    box-shadow: 0 0 0 3px #7dd3fc inset;
+  }
   .gcell.in-sequence{
     box-shadow: 0 0 0 2px #ffd76b inset;
   }
@@ -381,6 +393,10 @@
   }
   .hand-card.special.devil{ background: var(--devil-dim, #3a1e26); border-color: var(--devil, #ff4a6b); }
   .hand-card.special.angel{ background: var(--angel-dim, #3a3120); border-color: var(--angel, #ffd76b); }
+  .hand-card.special.move{ background: #12303e; border-color: #7dd3fc; }
+  .hand-card.forced-highlight{
+    box-shadow: 0 0 0 2px #fff;
+  }
   .hand-card.disabled{ opacity: 0.4; cursor: not-allowed; }
 
   .action-hint{
@@ -816,13 +832,15 @@
     if (!room) return;
 
     const players = room.players || {};
-    const playerIds = Object.keys(players).sort((a, b) => (players[a].order || 0) - (players[b].order || 0));
+    const joinedIds = Object.keys(players).sort((a, b) => (players[a].order || 0) - (players[b].order || 0));
+    // Orden de turnos al azar: se define una sola vez al arrancar y no cambia en toda la partida
+    const playerIds = shuffleArr(joinedIds);
 
     // Tablero: 72 dibujos x2, al azar
     const symbols = SYMBOLS_POOL.slice(0, 72);
     const board = shuffleArr([...symbols, ...symbols]);
 
-    // Mazo: 144 cartas (mismos dibujos x2) + 3 diablo + 3 ángel
+    // Mazo: 144 cartas (mismos dibujos x2) + 3 diablo + 3 ángel + 3 movimiento
     let deck = [];
     symbols.forEach(s => {
       deck.push({ type: 'symbol', value: s });
@@ -830,6 +848,7 @@
     });
     for (let i = 0; i < 3; i++) deck.push({ type: 'devil', value: '😈' });
     for (let i = 0; i < 3; i++) deck.push({ type: 'angel', value: '😇' });
+    for (let i = 0; i < 3; i++) deck.push({ type: 'move', value: '⇄' });
     deck = shuffleArr(deck);
 
     // Repartir 7 cartas a cada jugador
@@ -856,6 +875,7 @@
 
   // ========== LÓGICA DE JUEGO ==========
   let selectedCardIndex = null;
+  let moveSourceIndex = null; // celda origen elegida al jugar la carta de movimiento (⇄)
   let lastRenderedStatus = null;
 
   function getLines(){
@@ -978,12 +998,19 @@
       }
     });
 
-    let targetIndices = [];
-    let pendingMode = null; // 'place' | 'replace' | 'devil' | 'angel'
-    const myHand = (players[myPlayerId] && players[myPlayerId].hand) || [];
-    const selectedCard = (isMyTurn && selectedCardIndex !== null) ? myHand[selectedCardIndex] : null;
+    function countSpecials(hand){
+      return hand.filter(c => c.type !== 'symbol').length;
+    }
 
-    if (selectedCard){
+    let targetIndices = [];
+    let pendingMode = null; // 'place' | 'replace' | 'devil' | 'angel' | 'move-source' | 'move-dest'
+    const myHand = (players[myPlayerId] && players[myPlayerId].hand) || [];
+    const mustPlaySpecial = isMyTurn && countSpecials(myHand) >= 2;
+    const selectedCard = (selectedCardIndex !== null) ? myHand[selectedCardIndex] : null;
+    // Si hay que jugar sí o sí un comodín y la carta elegida es de símbolo, no vale
+    const cardIsBlocked = selectedCard && mustPlaySpecial && selectedCard.type === 'symbol';
+
+    if (selectedCard && !cardIsBlocked){
       if (selectedCard.type === 'symbol'){
         const symIdx = [];
         board.forEach((s, i) => { if (s === selectedCard.value) symIdx.push(i); });
@@ -1004,6 +1031,21 @@
       } else if (selectedCard.type === 'angel'){
         targetIndices = cells.map((c, i) => (!c || (c !== myColor && !seqHighlighted.has(i))) ? i : -1).filter(i => i >= 0);
         pendingMode = 'angel';
+      } else if (selectedCard.type === 'move'){
+        if (moveSourceIndex === null){
+          targetIndices = cells.map((c, i) => (c && !seqHighlighted.has(i)) ? i : -1).filter(i => i >= 0);
+          pendingMode = 'move-source';
+        } else {
+          const row = Math.floor(moveSourceIndex / 12);
+          const col = moveSourceIndex % 12;
+          const neighbors = [];
+          if (row > 0) neighbors.push(moveSourceIndex - 12);
+          if (row < 11) neighbors.push(moveSourceIndex + 12);
+          if (col > 0) neighbors.push(moveSourceIndex - 1);
+          if (col < 11) neighbors.push(moveSourceIndex + 1);
+          targetIndices = neighbors.filter(i => !cells[i] || !seqHighlighted.has(i));
+          pendingMode = 'move-dest';
+        }
       }
     }
 
@@ -1031,31 +1073,55 @@
       if (lastMoveIndices.has(i)){
         cell.classList.add('last-move');
       }
+      if (pendingMode === 'move-dest' && i === moveSourceIndex){
+        cell.classList.add('move-source-selected');
+      }
       if (targetIndices.includes(i)){
-        cell.classList.add('targetable');
-        cell.addEventListener('click', () => executeMove(room, code, i, pendingMode, selectedCard));
+        if (isMyTurn){
+          if (pendingMode === 'move-source'){
+            cell.classList.add('move-source');
+            cell.addEventListener('click', () => {
+              moveSourceIndex = i;
+              renderGame(room, code);
+            });
+          } else if (pendingMode === 'move-dest'){
+            cell.classList.add('targetable');
+            cell.addEventListener('click', () => executeMoveCard(code, moveSourceIndex, i, selectedCard));
+          } else {
+            cell.classList.add('targetable');
+            cell.addEventListener('click', () => executeMove(room, code, i, pendingMode, selectedCard));
+          }
+        } else {
+          cell.classList.add('preview-target');
+        }
       }
       boardEl.appendChild(cell);
     }
 
     // Hint de acción
     const hintEl = document.getElementById('action-hint');
-    if (!isMyTurn){
-      hintEl.innerHTML = 'Esperá tu turno.';
-    } else if (!selectedCard){
-      hintEl.innerHTML = 'Tocá una carta de tu mano para jugarla.';
+    if (!selectedCard){
+      hintEl.innerHTML = isMyTurn
+        ? (mustPlaySpecial ? 'Tenés 2 cartas especiales: tocá una para jugarla, no podés terminar el turno con las dos.' : 'Tocá una carta de tu mano para jugarla.')
+        : 'No es tu turno — podés tocar tus cartas para ver dónde se podrían jugar.';
+    } else if (cardIsBlocked){
+      hintEl.innerHTML = 'Tenés 2 cartas especiales en mano: tenés que jugar una de ellas (Diablo, Ángel o Movimiento) antes de una carta normal.';
     } else if (selectedCard.type === 'symbol' && targetIndices.length === 0){
-      hintEl.innerHTML = 'Ya tenés fichas tuyas ahí, o la única ficha rival está en una secuencia protegida. Tocá la carta de nuevo para descartarla y robar otra.';
+      hintEl.innerHTML = 'Ya tenés fichas tuyas ahí, o la única ficha rival está en una secuencia protegida.' + (isMyTurn ? ' Tocá la carta de nuevo para descartarla y robar otra.' : '');
     } else if (selectedCard.type === 'devil' && targetIndices.length === 0){
-      hintEl.innerHTML = '😈 No hay fichas rivales para sacar (están todas en secuencias protegidas). Tocá la carta de nuevo para descartarla y robar otra.';
+      hintEl.innerHTML = '😈 No hay fichas rivales para sacar (están todas en secuencias protegidas).' + (isMyTurn ? ' Tocá la carta de nuevo para descartarla y robar otra.' : '');
     } else if (pendingMode === 'place'){
-      hintEl.innerHTML = 'Tocá el casillero resaltado para poner tu ficha.';
+      hintEl.innerHTML = isMyTurn ? 'Tocá el casillero resaltado para poner tu ficha.' : 'Así se jugaría esta carta (no es tu turno).';
     } else if (pendingMode === 'replace'){
-      hintEl.innerHTML = 'Ambos casilleros ocupados: tocá uno para <b>sacar</b> la ficha rival y poner la tuya.';
+      hintEl.innerHTML = isMyTurn ? 'Ambos casilleros ocupados: tocá uno para <b>sacar</b> la ficha rival y poner la tuya.' : 'Así se jugaría esta carta (no es tu turno).';
     } else if (pendingMode === 'devil'){
-      hintEl.innerHTML = '😈 Tocá una ficha rival para sacarla del tablero.';
+      hintEl.innerHTML = isMyTurn ? '😈 Tocá una ficha rival para sacarla del tablero.' : 'Así se jugaría esta carta (no es tu turno).';
     } else if (pendingMode === 'angel'){
-      hintEl.innerHTML = '😇 Tocá cualquier casillero para poner tu ficha.';
+      hintEl.innerHTML = isMyTurn ? '😇 Tocá cualquier casillero para poner tu ficha.' : 'Así se jugaría esta carta (no es tu turno).';
+    } else if (pendingMode === 'move-source'){
+      hintEl.innerHTML = isMyTurn ? '⇄ Tocá la ficha que querés mover.' : 'Así se jugaría esta carta (no es tu turno).';
+    } else if (pendingMode === 'move-dest'){
+      hintEl.innerHTML = isMyTurn ? '⇄ Tocá una casilla vecina (arriba, abajo, izquierda o derecha): si está libre se mueve, si está ocupada se intercambian.' : 'Así se jugaría esta carta (no es tu turno).';
     }
 
     // Mano
@@ -1066,37 +1132,41 @@
       cardEl.className = 'hand-card';
       if (card.type !== 'symbol') cardEl.classList.add('special', card.type);
       if (idx === selectedCardIndex) cardEl.classList.add('selected');
-      if (!isMyTurn) cardEl.classList.add('disabled');
       if (card.type === 'symbol'){
         renderSymbol(cardEl, card.value);
       } else {
         cardEl.textContent = card.value;
       }
       cardEl.addEventListener('click', () => {
-        if (!isMyTurn) return;
         if (selectedCardIndex === idx){
-          // Segundo toque en carta sin destino válido: descartar y robar
-          if (card.type === 'symbol'){
-            const symIdx = [];
-            board.forEach((s, i) => { if (s === card.value) symIdx.push(i); });
-            const hasFree = symIdx.some(i => !cells[i]);
-            const hasRival = symIdx.some(i => cells[i] && cells[i] !== myColor && !seqHighlighted.has(i));
-            if (!hasFree && !hasRival){
-              discardAndDraw(room, code, idx);
-              selectedCardIndex = null;
-              return;
-            }
-          } else if (card.type === 'devil'){
-            const hasTarget = cells.some((c, i) => c && c !== myColor && !seqHighlighted.has(i));
-            if (!hasTarget){
-              discardAndDraw(room, code, idx);
-              selectedCardIndex = null;
-              return;
+          // Segundo toque en carta sin destino válido: descartar y robar (solo en tu turno)
+          if (isMyTurn && !mustPlaySpecial){
+            if (card.type === 'symbol'){
+              const symIdx = [];
+              board.forEach((s, i) => { if (s === card.value) symIdx.push(i); });
+              const hasFree = symIdx.some(i => !cells[i]);
+              const hasRival = symIdx.some(i => cells[i] && cells[i] !== myColor && !seqHighlighted.has(i));
+              if (!hasFree && !hasRival){
+                discardAndDraw(room, code, idx);
+                selectedCardIndex = null;
+                moveSourceIndex = null;
+                return;
+              }
+            } else if (card.type === 'devil'){
+              const hasTarget = cells.some((c, i) => c && c !== myColor && !seqHighlighted.has(i));
+              if (!hasTarget){
+                discardAndDraw(room, code, idx);
+                selectedCardIndex = null;
+                moveSourceIndex = null;
+                return;
+              }
             }
           }
           selectedCardIndex = null;
+          moveSourceIndex = null;
         } else {
           selectedCardIndex = idx;
+          moveSourceIndex = null;
         }
         renderGame(room, code);
       });
@@ -1150,6 +1220,7 @@
       discard: newDiscard,
       turnIndex: nextIndex
     });
+    moveSourceIndex = null;
   }
 
   async function executeMove(room, code, cellIndex, mode, card){
@@ -1167,6 +1238,7 @@
     const myHand = (fresh.players[myPlayerId].hand || []).slice();
     const handIdx = myHand.findIndex(c => c.type === card.type && c.value === card.value);
     if (handIdx === -1) return;
+    if (card.type === 'symbol' && myHand.filter(c => c.type !== 'symbol').length >= 2) return;
 
     if (mode === 'devil'){
       cells[cellIndex] = null;
@@ -1206,6 +1278,65 @@
     }
 
     selectedCardIndex = null;
+    moveSourceIndex = null;
+    await roomRef.update(updates);
+  }
+
+  async function executeMoveCard(code, sourceIdx, destIdx, card){
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    const snap = await roomRef.get();
+    const fresh = snap.val();
+    if (!fresh || fresh.status !== 'playing') return;
+
+    const turnOrder = fresh.turnOrder || [];
+    const currentTurnId = turnOrder[fresh.turnIndex];
+    if (currentTurnId !== myPlayerId) return;
+
+    const cells = normalizeCells(fresh.cells);
+    const myHand = (fresh.players[myPlayerId].hand || []).slice();
+    const handIdx = myHand.findIndex(c => c.type === card.type && c.value === card.value);
+    if (handIdx === -1) return;
+    if (sourceIdx === null || sourceIdx === undefined || !cells[sourceIdx]) return;
+
+    const movedColor = cells[sourceIdx];
+    const displacedColor = cells[destIdx] || null;
+    cells[destIdx] = movedColor;
+    cells[sourceIdx] = displacedColor;
+
+    const playedCard = myHand.splice(handIdx, 1)[0];
+    let discard = (fresh.discard || []).slice();
+    discard.push(playedCard);
+
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh, fresh.deck || [], discard);
+    if (drawn) myHand.push(drawn);
+
+    const colorsInPlay = turnOrder.map(pid => fresh.players[pid].color);
+    const { winnerColor } = analyzeBoard(cells, colorsInPlay);
+    let winnerId = null;
+    if (winnerColor){
+      winnerId = turnOrder.find(pid => fresh.players[pid].color === winnerColor);
+    }
+
+    const nextIndex = (fresh.turnIndex + 1) % turnOrder.length;
+
+    const updates = {
+      cells: cells,
+      [`players/${myPlayerId}/hand`]: myHand,
+      deck: newDeck,
+      discard: newDiscard,
+      turnIndex: nextIndex,
+      [`lastMoveByColor/${movedColor}`]: destIdx
+    };
+    if (displacedColor){
+      updates[`lastMoveByColor/${displacedColor}`] = sourceIdx;
+    }
+    if (winnerId){
+      updates.status = 'finished';
+      updates.winnerId = winnerId;
+    }
+
+    selectedCardIndex = null;
+    moveSourceIndex = null;
     await roomRef.update(updates);
   }
 
