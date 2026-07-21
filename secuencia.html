@@ -288,6 +288,23 @@
   }
   .deck-count-pill b{ color: var(--text); }
 
+  .action-toasts{
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .action-toasts:not(:empty){ margin-bottom: 10px; }
+  .toast-line{
+    border-radius: 10px;
+    padding: 9px 13px;
+    font-size: 13px;
+    text-align: center;
+    border: 1px solid;
+  }
+  .toast-line.devil{ background: var(--devil-dim, #3a1e26); border-color: var(--devil, #ff4a6b); }
+  .toast-line.angel{ background: var(--angel-dim, #3a3120); border-color: var(--angel, #ffd76b); }
+  .toast-line.move{ background: #12303e; border-color: #7dd3fc; }
+
   .game-board-shell{
     background: var(--panel);
     border: 1px solid var(--line);
@@ -314,6 +331,35 @@
     user-select: none;
   }
   .gcell:nth-child(odd){ background: #17191f; }
+  .gcell.devil-marked{
+    box-shadow: 0 0 0 2px var(--devil, #ff4a6b) inset;
+  }
+  .gcell.devil-marked::after{
+    content: '😈';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 65%;
+    opacity: 0.55;
+  }
+  .action-badge{
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #0d0f14;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    line-height: 1;
+    z-index: 3;
+    border: 1px solid rgba(255,255,255,0.35);
+  }
   .gcell .piece{
     position: absolute;
     inset: 12%;
@@ -367,28 +413,27 @@
   }
   .hand-row{
     display:flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
+    gap: 5px;
+    width: 100%;
   }
   .hand-card{
-    flex-shrink: 0;
-    width: 56px;
-    height: 78px;
+    flex: 1 1 0;
+    min-width: 0;
+    aspect-ratio: 5 / 7;
     background: var(--panel-2);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: 8px;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size: 26px;
+    font-size: clamp(14px, 5.2vw, 24px);
     cursor: pointer;
     transition: transform .12s ease, border-color .15s ease;
   }
   .hand-card:active{ transform: scale(0.94); }
   .hand-card.selected{
     border-color: var(--accent);
-    transform: translateY(-6px);
+    transform: translateY(-5px);
     box-shadow: 0 4px 10px rgba(0,0,0,0.4);
   }
   .hand-card.special.devil{ background: var(--devil-dim, #3a1e26); border-color: var(--devil, #ff4a6b); }
@@ -546,6 +591,8 @@
       </div>
       <div class="deck-count-pill">Mazo: <b id="deck-count">-</b></div>
     </div>
+
+    <div class="action-toasts" id="action-toasts"></div>
 
     <div class="game-board-shell">
       <div class="game-board" id="game-board"></div>
@@ -851,11 +898,26 @@
     for (let i = 0; i < 3; i++) deck.push({ type: 'move', value: '⇄' });
     deck = shuffleArr(deck);
 
-    // Repartir 7 cartas a cada jugador
+    // Repartir 7 cartas a cada jugador, sin permitir 2+ comodines en la mano inicial
+    function fixInitialHand(hand, deck){
+      let specialsCount = hand.filter(c => c.type !== 'symbol').length;
+      while (specialsCount >= 2){
+        const idx = hand.findIndex(c => c.type !== 'symbol');
+        const removed = hand.splice(idx, 1)[0];
+        deck.push(removed);
+        const draw = deck.shift();
+        hand.push(draw);
+        specialsCount = hand.filter(c => c.type !== 'symbol').length;
+      }
+    }
+
     const hands = {};
     playerIds.forEach(pid => {
-      hands[pid] = deck.splice(0, 7);
+      const hand = deck.splice(0, 7);
+      fixInitialHand(hand, deck);
+      hands[pid] = hand;
     });
+    deck = shuffleArr(deck);
 
     const updates = {
       status: 'playing',
@@ -921,7 +983,7 @@
       let runStart = 0;
       const flush = (endExclusive) => {
         if (runColor && runLen >= 5){
-          counts[runColor] = (counts[runColor] || 0) + Math.max(0, runLen - 4);
+          counts[runColor] = (counts[runColor] || 0) + (Math.floor((runLen - 5) / 4) + 1);
           for (let k = runStart; k < endExclusive; k++) highlighted.add(line[k]);
         }
       };
@@ -1057,6 +1119,55 @@
       if (cells[idx] === color) lastMoveIndices.add(idx);
     });
 
+    // Marca del Diablo: se mantiene mientras ese casillero siga vacío
+    const hasDevilMark = (
+      room.lastDevilCell !== undefined &&
+      room.lastDevilCell !== null &&
+      cells[room.lastDevilCell] === null
+    );
+
+    // Marca del Ángel: se mantiene mientras esa ficha siga ahí sin cambios
+    const hasAngelMark = (
+      room.lastAngelCell !== undefined &&
+      room.lastAngelCell !== null &&
+      room.lastAngelAction &&
+      cells[room.lastAngelCell] === room.lastAngelAction.color
+    );
+
+    // Marca del Movimiento: se mantiene mientras la ficha movida siga en destino
+    const swapAction = room.lastSwapAction;
+    const hasSwapMark = swapAction && cells[swapAction.toCell] === swapAction.movedColor;
+    const swapBadgeCells = new Set();
+    if (hasSwapMark){
+      swapBadgeCells.add(swapAction.toCell);
+      if (swapAction.displacedColor && cells[swapAction.fromCell] === swapAction.displacedColor){
+        swapBadgeCells.add(swapAction.fromCell);
+      }
+    }
+
+    const toastsEl = document.getElementById('action-toasts');
+    toastsEl.innerHTML = '';
+    if (hasDevilMark && room.lastDevilAction){
+      const da = room.lastDevilAction;
+      const div = document.createElement('div');
+      div.className = 'toast-line devil';
+      div.innerHTML = `😈 <b>${da.byName}</b> sacó una ficha ${da.targetColor || ''} con el Diablo`;
+      toastsEl.appendChild(div);
+    }
+    if (hasAngelMark){
+      const div = document.createElement('div');
+      div.className = 'toast-line angel';
+      div.innerHTML = `😇 <b>${room.lastAngelAction.byName}</b> puso una ficha con el Ángel`;
+      toastsEl.appendChild(div);
+    }
+    if (hasSwapMark){
+      const div = document.createElement('div');
+      div.className = 'toast-line move';
+      const verb = swapAction.displacedColor ? 'intercambió' : 'movió';
+      div.innerHTML = `⇄ <b>${swapAction.byName}</b> ${verb} una ficha`;
+      toastsEl.appendChild(div);
+    }
+
     boardEl.innerHTML = '';
     for (let i = 0; i < 144; i++){
       const cell = document.createElement('div');
@@ -1066,6 +1177,21 @@
         const piece = document.createElement('div');
         piece.className = 'piece ' + cells[i];
         cell.appendChild(piece);
+        if (hasAngelMark && i === room.lastAngelCell){
+          const badge = document.createElement('div');
+          badge.className = 'action-badge';
+          badge.textContent = '😇';
+          cell.appendChild(badge);
+        }
+        if (swapBadgeCells.has(i)){
+          const badge = document.createElement('div');
+          badge.className = 'action-badge';
+          badge.textContent = '⇄';
+          cell.appendChild(badge);
+        }
+      }
+      if (hasDevilMark && i === room.lastDevilCell){
+        cell.classList.add('devil-marked');
       }
       if (seqHighlighted.has(i)){
         cell.classList.add('in-sequence');
@@ -1240,7 +1366,9 @@
     if (handIdx === -1) return;
     if (card.type === 'symbol' && myHand.filter(c => c.type !== 'symbol').length >= 2) return;
 
+    let removedColor = null;
     if (mode === 'devil'){
+      removedColor = cells[cellIndex];
       cells[cellIndex] = null;
     } else {
       cells[cellIndex] = myColor;
@@ -1271,6 +1399,21 @@
     };
     if (mode !== 'devil'){
       updates[`lastMoveByColor/${myColor}`] = cellIndex;
+      if (card.type === 'angel'){
+        updates.lastAngelCell = cellIndex;
+        updates.lastAngelAction = {
+          byName: fresh.players[myPlayerId].name,
+          color: myColor
+        };
+      }
+    } else {
+      updates.lastDevilCell = cellIndex;
+      updates.lastDevilAction = {
+        byName: fresh.players[myPlayerId].name,
+        byColor: myColor,
+        targetColor: removedColor,
+        cellIndex: cellIndex
+      };
     }
     if (winnerId){
       updates.status = 'finished';
@@ -1325,7 +1468,14 @@
       deck: newDeck,
       discard: newDiscard,
       turnIndex: nextIndex,
-      [`lastMoveByColor/${movedColor}`]: destIdx
+      [`lastMoveByColor/${movedColor}`]: destIdx,
+      lastSwapAction: {
+        byName: fresh.players[myPlayerId].name,
+        fromCell: sourceIdx,
+        toCell: destIdx,
+        movedColor: movedColor,
+        displacedColor: displacedColor
+      }
     };
     if (displacedColor){
       updates[`lastMoveByColor/${displacedColor}`] = sourceIdx;
