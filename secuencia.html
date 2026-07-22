@@ -304,6 +304,7 @@
   .toast-line.devil{ background: var(--devil-dim, #3a1e26); border-color: var(--devil, #ff4a6b); }
   .toast-line.angel{ background: var(--angel-dim, #3a3120); border-color: var(--angel, #ffd76b); }
   .toast-line.move{ background: #12303e; border-color: #7dd3fc; }
+  .toast-line.minus1{ background: #2a2a2a; border-color: #a1a1aa; }
 
   .game-board-shell{
     background: var(--panel);
@@ -334,16 +335,6 @@
   .gcell.devil-marked{
     box-shadow: 0 0 0 2px var(--devil, #ff4a6b) inset;
   }
-  .gcell.devil-marked::after{
-    content: '😈';
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 65%;
-    opacity: 0.55;
-  }
   .action-badge{
     position: absolute;
     top: -4px;
@@ -359,6 +350,11 @@
     line-height: 1;
     z-index: 3;
     border: 1px solid rgba(255,255,255,0.35);
+  }
+  .action-badge .swap-icon{
+    width: 70%;
+    height: 70%;
+    filter: none;
   }
   .gcell .piece{
     position: absolute;
@@ -438,7 +434,33 @@
   }
   .hand-card.special.devil{ background: var(--devil-dim, #3a1e26); border-color: var(--devil, #ff4a6b); }
   .hand-card.special.angel{ background: var(--angel-dim, #3a3120); border-color: var(--angel, #ffd76b); }
-  .hand-card.special.move{ background: #12303e; border-color: #7dd3fc; }
+  .hand-card.special.move{ background: linear-gradient(150deg, #0d2836, #12303e); border-color: #7dd3fc; }
+  .hand-card.special.plus1{ background: linear-gradient(150deg, #0f2a17, #143a1e); border-color: #4ade80; }
+  .hand-card.special.minus1{ background: linear-gradient(150deg, #1c1c1f, #2a2a2e); border-color: #a1a1aa; }
+  .hand-card .swap-icon{
+    width: 42%;
+    height: 42%;
+    color: #7dd3fc;
+    filter: drop-shadow(0 0 6px rgba(125,211,252,0.45));
+  }
+  .hand-card .big-num{
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+  }
+  .hand-card.plus1 .big-num{
+    background: linear-gradient(180deg, #bbf7d0, #4ade80);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 6px rgba(74,222,128,0.4));
+  }
+  .hand-card.minus1 .big-num{
+    background: linear-gradient(180deg, #e4e4e7, #a1a1aa);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 6px rgba(161,161,170,0.35));
+  }
   .hand-card.forced-highlight{
     box-shadow: 0 0 0 2px #fff;
   }
@@ -452,6 +474,20 @@
     margin-bottom: 8px;
   }
   .action-hint b{ color: var(--accent); }
+  .special-action-area{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: -4px 0 10px;
+  }
+  .special-action-area button{
+    width: auto;
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+  .player-chip.cursed{ border-color: #a1a1aa; }
+  .player-chip .curse-tag{ color: #a1a1aa; }
 
   .players-strip{
     display:flex;
@@ -599,6 +635,7 @@
     </div>
 
     <div class="action-hint" id="action-hint">Tocá una carta de tu mano.</div>
+    <div class="special-action-area" id="special-action-area"></div>
 
     <div class="hand-section" id="hand-section">
       <div class="hand-label">Tu mano</div>
@@ -840,6 +877,8 @@
     });
   });
 
+  const SWAP_ICON_SVG = '<svg class="swap-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M9 3 5 7l4 4V8h8V6H9V3zm6 18 4-4-4-4v3H7v2h8v3z"/></svg>';
+
   function renderSymbol(el, value){
     const [letter, colorName] = value.split('-');
     const hex = SYMBOL_COLORS[colorName] || '#666';
@@ -893,9 +932,11 @@
       deck.push({ type: 'symbol', value: s });
       deck.push({ type: 'symbol', value: s });
     });
-    for (let i = 0; i < 3; i++) deck.push({ type: 'devil', value: '😈' });
-    for (let i = 0; i < 3; i++) deck.push({ type: 'angel', value: '😇' });
-    for (let i = 0; i < 3; i++) deck.push({ type: 'move', value: '⇄' });
+    for (let i = 0; i < 2; i++) deck.push({ type: 'devil', value: '😈' });
+    for (let i = 0; i < 2; i++) deck.push({ type: 'angel', value: '😇' });
+    for (let i = 0; i < 2; i++) deck.push({ type: 'move', value: '⇄' });
+    for (let i = 0; i < 2; i++) deck.push({ type: 'plus1', value: '+1' });
+    for (let i = 0; i < 2; i++) deck.push({ type: 'minus1', value: '-1' });
     deck = shuffleArr(deck);
 
     // Repartir 7 cartas a cada jugador, sin permitir 2+ comodines en la mano inicial
@@ -1023,8 +1064,8 @@
       const p = players[pid];
       if (!p) return;
       const chip = document.createElement('div');
-      chip.className = 'player-chip' + (pid === currentTurnId ? ' active-turn' : '');
-      chip.innerHTML = `<span class="turn-dot ${p.color}"></span>${p.name}<span class="n">${(p.hand || []).length}🎴</span>`;
+      chip.className = 'player-chip' + (pid === currentTurnId ? ' active-turn' : '') + (p.cursed ? ' cursed' : '');
+      chip.innerHTML = `<span class="turn-dot ${p.color}"></span>${p.name}<span class="n">${(p.hand || []).length}🎴</span>${p.cursed ? '<span class="curse-tag">➖</span>' : ''}`;
       strip.appendChild(chip);
     });
 
@@ -1167,6 +1208,14 @@
       div.innerHTML = `⇄ <b>${swapAction.byName}</b> ${verb} una ficha`;
       toastsEl.appendChild(div);
     }
+    const minus1Action = room.lastMinus1Action;
+    const hasMinus1Toast = minus1Action && players[minus1Action.targetId] && players[minus1Action.targetId].cursed;
+    if (hasMinus1Toast){
+      const div = document.createElement('div');
+      div.className = 'toast-line minus1';
+      div.innerHTML = `➖ <b>${minus1Action.byName}</b> le pasó el -1 a <b>${minus1Action.targetName}</b>: no va a robar carta en su próximo turno`;
+      toastsEl.appendChild(div);
+    }
 
     boardEl.innerHTML = '';
     for (let i = 0; i < 144; i++){
@@ -1186,12 +1235,16 @@
         if (swapBadgeCells.has(i)){
           const badge = document.createElement('div');
           badge.className = 'action-badge';
-          badge.textContent = '⇄';
+          badge.innerHTML = SWAP_ICON_SVG;
           cell.appendChild(badge);
         }
       }
       if (hasDevilMark && i === room.lastDevilCell){
         cell.classList.add('devil-marked');
+        const badge = document.createElement('div');
+        badge.className = 'action-badge';
+        badge.textContent = '😈';
+        cell.appendChild(badge);
       }
       if (seqHighlighted.has(i)){
         cell.classList.add('in-sequence');
@@ -1231,7 +1284,7 @@
         ? (mustPlaySpecial ? 'Tenés 2 cartas especiales: tocá una para jugarla, no podés terminar el turno con las dos.' : 'Tocá una carta de tu mano para jugarla.')
         : 'No es tu turno — podés tocar tus cartas para ver dónde se podrían jugar.';
     } else if (cardIsBlocked){
-      hintEl.innerHTML = 'Tenés 2 cartas especiales en mano: tenés que jugar una de ellas (Diablo, Ángel o Movimiento) antes de una carta normal.';
+      hintEl.innerHTML = 'Tenés 2 cartas especiales en mano: tenés que jugar una de ellas antes de una carta normal.';
     } else if (selectedCard.type === 'symbol' && targetIndices.length === 0){
       hintEl.innerHTML = 'Ya tenés fichas tuyas ahí, o la única ficha rival está en una secuencia protegida.' + (isMyTurn ? ' Tocá la carta de nuevo para descartarla y robar otra.' : '');
     } else if (selectedCard.type === 'devil' && targetIndices.length === 0){
@@ -1248,9 +1301,34 @@
       hintEl.innerHTML = isMyTurn ? '⇄ Tocá la ficha que querés mover.' : 'Así se jugaría esta carta (no es tu turno).';
     } else if (pendingMode === 'move-dest'){
       hintEl.innerHTML = isMyTurn ? '⇄ Tocá una casilla vecina (arriba, abajo, izquierda o derecha): si está libre se mueve, si está ocupada se intercambian.' : 'Así se jugaría esta carta (no es tu turno).';
+    } else if (selectedCard.type === 'plus1'){
+      hintEl.innerHTML = isMyTurn ? '➕ No ponés ficha: confirmá para robar 2 cartas.' : 'Así se jugaría esta carta (no es tu turno).';
+    } else if (selectedCard.type === 'minus1'){
+      hintEl.innerHTML = isMyTurn ? '➖ No ponés ficha: elegí a quién se la das. Esa persona no va a robar carta en su próximo turno.' : 'Así se jugaría esta carta (no es tu turno).';
     }
 
-    // Mano
+    // Área de acción especial (+1 / -1)
+    const specialActionArea = document.getElementById('special-action-area');
+    specialActionArea.innerHTML = '';
+    if (isMyTurn && selectedCard && !cardIsBlocked){
+      if (selectedCard.type === 'plus1'){
+        const btn = document.createElement('button');
+        btn.className = 'primary';
+        btn.textContent = 'Confirmar +1 (robar 2 cartas)';
+        btn.addEventListener('click', () => executePlus1(code, selectedCard));
+        specialActionArea.appendChild(btn);
+      } else if (selectedCard.type === 'minus1'){
+        turnOrder.forEach(pid => {
+          if (pid === myPlayerId) return;
+          const p = players[pid];
+          if (!p) return;
+          const btn = document.createElement('button');
+          btn.textContent = `Dársela a ${p.name}`;
+          btn.addEventListener('click', () => executeMinus1(code, selectedCard, pid));
+          specialActionArea.appendChild(btn);
+        });
+      }
+    }
     const handRow = document.getElementById('hand-row');
     handRow.innerHTML = '';
     myHand.forEach((card, idx) => {
@@ -1260,6 +1338,10 @@
       if (idx === selectedCardIndex) cardEl.classList.add('selected');
       if (card.type === 'symbol'){
         renderSymbol(cardEl, card.value);
+      } else if (card.type === 'move'){
+        cardEl.innerHTML = SWAP_ICON_SVG;
+      } else if (card.type === 'plus1' || card.type === 'minus1'){
+        cardEl.innerHTML = `<span class="big-num">${card.value}</span>`;
       } else {
         cardEl.textContent = card.value;
       }
@@ -1315,14 +1397,18 @@
     }
   }
 
-  async function drawReplacement(roomSnapVal, deck, discard){
+  async function drawReplacement(deck, discard, count){
     let newDeck = deck.slice();
     let newDiscard = discard.slice();
-    if (newDeck.length === 0){
-      newDeck = shuffleArr(newDiscard);
-      newDiscard = [];
+    const drawn = [];
+    for (let k = 0; k < count; k++){
+      if (newDeck.length === 0){
+        newDeck = shuffleArr(newDiscard);
+        newDiscard = [];
+      }
+      if (newDeck.length === 0) break;
+      drawn.push(newDeck.shift());
     }
-    const drawn = newDeck.shift();
     return { drawn, newDeck, newDiscard };
   }
 
@@ -1335,17 +1421,21 @@
     let discard = (fresh.discard || []).slice();
     discard.push(playedCard);
 
-    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh, fresh.deck || [], discard);
-    if (drawn) myHand.push(drawn);
+    const isCursed = !!fresh.players[myPlayerId].cursed;
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh.deck || [], discard, isCursed ? 0 : 1);
+    drawn.forEach(c => myHand.push(c));
 
     const nextIndex = (fresh.turnIndex + 1) % fresh.turnOrder.length;
 
-    await roomRef.update({
+    const updates = {
       [`players/${myPlayerId}/hand`]: myHand,
       deck: newDeck,
       discard: newDiscard,
       turnIndex: nextIndex
-    });
+    };
+    if (isCursed) updates[`players/${myPlayerId}/cursed`] = null;
+
+    await roomRef.update(updates);
     moveSourceIndex = null;
   }
 
@@ -1378,8 +1468,9 @@
     let discard = (fresh.discard || []).slice();
     discard.push(playedCard);
 
-    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh, fresh.deck || [], discard);
-    if (drawn) myHand.push(drawn);
+    const isCursed = !!fresh.players[myPlayerId].cursed;
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh.deck || [], discard, isCursed ? 0 : 1);
+    drawn.forEach(c => myHand.push(c));
 
     const colorsInPlay = turnOrder.map(pid => fresh.players[pid].color);
     const { winnerColor } = analyzeBoard(cells, colorsInPlay);
@@ -1397,6 +1488,7 @@
       discard: newDiscard,
       turnIndex: nextIndex
     };
+    if (isCursed) updates[`players/${myPlayerId}/cursed`] = null;
     if (mode !== 'devil'){
       updates[`lastMoveByColor/${myColor}`] = cellIndex;
       if (card.type === 'angel'){
@@ -1450,8 +1542,9 @@
     let discard = (fresh.discard || []).slice();
     discard.push(playedCard);
 
-    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh, fresh.deck || [], discard);
-    if (drawn) myHand.push(drawn);
+    const isCursed = !!fresh.players[myPlayerId].cursed;
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh.deck || [], discard, isCursed ? 0 : 1);
+    drawn.forEach(c => myHand.push(c));
 
     const colorsInPlay = turnOrder.map(pid => fresh.players[pid].color);
     const { winnerColor } = analyzeBoard(cells, colorsInPlay);
@@ -1480,10 +1573,92 @@
     if (displacedColor){
       updates[`lastMoveByColor/${displacedColor}`] = sourceIdx;
     }
+    if (isCursed) updates[`players/${myPlayerId}/cursed`] = null;
     if (winnerId){
       updates.status = 'finished';
       updates.winnerId = winnerId;
     }
+
+    selectedCardIndex = null;
+    moveSourceIndex = null;
+    await roomRef.update(updates);
+  }
+
+  async function executePlus1(code, card){
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    const snap = await roomRef.get();
+    const fresh = snap.val();
+    if (!fresh || fresh.status !== 'playing') return;
+
+    const turnOrder = fresh.turnOrder || [];
+    const currentTurnId = turnOrder[fresh.turnIndex];
+    if (currentTurnId !== myPlayerId) return;
+
+    const myHand = (fresh.players[myPlayerId].hand || []).slice();
+    const handIdx = myHand.findIndex(c => c.type === card.type && c.value === card.value);
+    if (handIdx === -1) return;
+
+    const playedCard = myHand.splice(handIdx, 1)[0];
+    let discard = (fresh.discard || []).slice();
+    discard.push(playedCard);
+
+    const isCursed = !!fresh.players[myPlayerId].cursed;
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh.deck || [], discard, isCursed ? 0 : 2);
+    drawn.forEach(c => myHand.push(c));
+
+    const nextIndex = (fresh.turnIndex + 1) % turnOrder.length;
+
+    const updates = {
+      [`players/${myPlayerId}/hand`]: myHand,
+      deck: newDeck,
+      discard: newDiscard,
+      turnIndex: nextIndex
+    };
+    if (isCursed) updates[`players/${myPlayerId}/cursed`] = null;
+
+    selectedCardIndex = null;
+    moveSourceIndex = null;
+    await roomRef.update(updates);
+  }
+
+  async function executeMinus1(code, card, targetId){
+    const roomRef = db.ref(`${ROOT}/rooms/${code}`);
+    const snap = await roomRef.get();
+    const fresh = snap.val();
+    if (!fresh || fresh.status !== 'playing') return;
+
+    const turnOrder = fresh.turnOrder || [];
+    const currentTurnId = turnOrder[fresh.turnIndex];
+    if (currentTurnId !== myPlayerId) return;
+    if (!fresh.players[targetId]) return;
+
+    const myHand = (fresh.players[myPlayerId].hand || []).slice();
+    const handIdx = myHand.findIndex(c => c.type === card.type && c.value === card.value);
+    if (handIdx === -1) return;
+
+    const playedCard = myHand.splice(handIdx, 1)[0];
+    let discard = (fresh.discard || []).slice();
+    discard.push(playedCard);
+
+    const isCursed = !!fresh.players[myPlayerId].cursed;
+    const { drawn, newDeck, newDiscard } = await drawReplacement(fresh.deck || [], discard, isCursed ? 0 : 1);
+    drawn.forEach(c => myHand.push(c));
+
+    const nextIndex = (fresh.turnIndex + 1) % turnOrder.length;
+
+    const updates = {
+      [`players/${myPlayerId}/hand`]: myHand,
+      deck: newDeck,
+      discard: newDiscard,
+      turnIndex: nextIndex,
+      [`players/${targetId}/cursed`]: true,
+      lastMinus1Action: {
+        byName: fresh.players[myPlayerId].name,
+        targetId: targetId,
+        targetName: fresh.players[targetId].name
+      }
+    };
+    if (isCursed) updates[`players/${myPlayerId}/cursed`] = null;
 
     selectedCardIndex = null;
     moveSourceIndex = null;
